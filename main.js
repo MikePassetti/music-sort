@@ -21,23 +21,23 @@ async function run() {
     // the size of cells
     const interval = 50;
 
-    // init the sort - change sorting alg here
-    const sortSteps = staff.bubble_sort();
+    // init the sort
+    let sortSteps = staff.bubble_sort();
     console.log("sorted cells: ", sortSteps)
     let stepIndex = 0;
 
     // construct audiocontext, osc n gain
     const audioCtx = new AudioContext();
-    const osc = audioCtx.createOscillator();
+    let osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
+   
     // connect osc to gain to destination(speakers)
     osc.connect(gain);
     gain.connect(audioCtx.destination);
 
     // set gain volume
     gain.gain.value = 0.05;
-
+    
     // pitch n note index
     const pitchIndex = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88];
     const noteIndex = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
@@ -99,6 +99,7 @@ async function run() {
 
     // animates cells n plays audio for each swap
     function animateSort() {
+        resetOscillator();
         if (stepIndex >= sortSteps.length) {
             osc.stop();
             return;
@@ -110,6 +111,7 @@ async function run() {
         drawStep(step);
 
         // play audio for swapped notes
+        gain.gain.value = 0.05;
         const notes = Array.from(step[0]);
         const swapA = step[1];
         const swapB = step[2];
@@ -128,7 +130,30 @@ async function run() {
         setTimeout(animateSort, 1000);
     }
 
-    // inits audio
+    // the osc needs to be remade everytime alg changes as can only call start() once for each audiocontext
+    function resetOscillator() {
+        if (osc) {
+            try { osc.stop(); } catch (e) {}
+            osc.disconnect();
+        }
+        osc = audioCtx.createOscillator();
+        osc.connect(gain);
+        osc.start();
+    }
+
+    function setSelection(selection) {
+        if (selection == 'bubble') {
+            return staff.bubble_sort()
+        } else if (selection == 'insertion') {
+            return staff.insertion_sort()
+        } else if (selection == 'selection') {
+            return staff.selection_sort()
+        }
+    }
+
+// event listeners
+
+    // inits audio n animation
     const playButton = document.querySelector("button");
     playButton.addEventListener(
         "click", () => {
@@ -139,22 +164,30 @@ async function run() {
 
             // play or pause depending on state
             if (playButton.dataset.playing === "false") {
-                osc.start(0);
+                resetOscillator();
                 playButton.dataset.playing = "true";
+                animateSort();
             } else if (playButton.dataset.playing === "true") {
                 playButton.dataset.playing = "false";
+                if (osc) {
+                    try { osc.stop(); } catch (e) {}
+                    osc.disconnect();
+                }
             }
         },
         false,
     );
 
-    // inits the sort animation
-    playButton.addEventListener(
-        "click", () => {
-            animateSort();
-        },
-        false,
-    );
+    // select the alg
+    const sortOption = document.querySelector("select");
+    sortOption.addEventListener("change", (e) => {
+        const selection = e.target.value;
+        sortSteps = setSelection(selection);
+        stepIndex = 0;
+        console.log("changed to: ", selection, sortSteps);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+    })
 
     drawGrid();
 }
